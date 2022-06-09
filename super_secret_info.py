@@ -1,3 +1,3 @@
 API_KEY = 'UJOGY'
 USER = 'Kruiwagen'
-BASE = 'https://orderbookz.com/'
+BASE = 'https://orderbookz.com'

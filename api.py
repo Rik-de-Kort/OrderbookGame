@@ -1,17 +1,26 @@
 import requests
+from time import sleep
 from datetime import datetime
 from super_secret_info import API_KEY, BASE
 
+def retry(req):
+    response = req()
+    timeout = response.status_code == 429
+    while timeout:
+        sleep(0.2)
+        response = req()
+        timeout = response.status_code == 429
+    response.raise_for_status()
+    return response
+
 
 def get_balance(venue):
-    response = requests.get(f'{BASE}/{venue}/api/balance', headers={'API-Key': API_KEY})
-    response.raise_for_status()
+    response = retry(lambda: requests.get(f'{BASE}/{venue}/api/balance', headers={'API-Key': API_KEY}))
     return response.json()
 
 
 def get_active_orders(venue):
-    response = requests.get(f'{BASE}/{venue}/api/orders/active', headers={'API-Key': API_KEY})
-    response.raise_for_status()
+    response = retry(lambda: requests.get(f'{BASE}/{venue}/api/orders/active', headers={'API-Key': API_KEY}))
     data = response.json()
     for order in data:
         order['price'] = float(order['price'])
@@ -21,8 +30,7 @@ def get_active_orders(venue):
 
 def get_trades(venue):
     ## N.B. ONLY RETURNS FIRST PAGE OF TRADES
-    response = requests.get(f'{BASE}/{venue}/api/trades', headers={'API-Key': API_KEY})
-    response.raise_for_status()
+    response = retry(lambda: requests.get(f'{BASE}/{venue}/api/trades', headers={'API-Key': API_KEY}))
     to_return = response.json()['data']
     for item in to_return:
         item['price'] = float(item['price'])
@@ -31,8 +39,7 @@ def get_trades(venue):
 
 
 def get_orderbook(venue):
-    response = requests.get(f'{BASE}/{venue}/api/orderbook', headers={'API-Key': API_KEY})
-    response.raise_for_status()
+    response = retry(lambda: requests.get(f'{BASE}/{venue}/api/orderbook', headers={'API-Key': API_KEY}))
     data = response.json()
     return {
         'buy': [(float(price), amount) for price, amount in data['buy']],
@@ -46,20 +53,20 @@ def submit_order(venue: str, price: float, quantity: int, direction: str, time_i
     if time_in_force not in ('GTC', 'IOC'):
         raise ValueError('time_in_force should be one of "GTC", "IOC"')
     data = {'p': str(round(float(price), 1)), 'q': quantity, 'd': direction, 'tif': time_in_force}
-    response = requests.post(f'{BASE}/{venue}/api/submit', json=data, headers={'API-Key': API_KEY})
-    response.raise_for_status()
-    return response.json()
+    response = retry(lambda: requests.post(f'{BASE}/{venue}/api/submit', json=data, headers={'API-Key': API_KEY}))
+    data = response.json()
+    data['order']['price'] = float(data['order']['price'])
+    data['order']['submit_time'] = datetime.strptime(data['order']['submit_time'], '%d %m %Y %H:%M:%S.%f')
+    return data
 
 
 def cancel_order(venue: str, order_id: str):
-    response = requests.put(f'{BASE}/{venue}/api/cancel', json={'id': order_id}, headers={'API-Key': API_KEY})
-    response.raise_for_status()
+    response = retry(lambda: requests.put(f'{BASE}/{venue}/api/cancel', json={'id': order_id}, headers={'API-Key': API_KEY}))
     return response.json()
 
 
 def cancel_all_orders(venue: str):
-    response = requests.put(f'{BASE}/{venue}/api/cancel/all', headers={'API-Key': API_KEY})
-    response.raise_for_status()
+    response = retry(lambda: requests.put(f'{BASE}/{venue}/api/cancel/all', headers={'API-Key': API_KEY}))
     return response.json()
 
 

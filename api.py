@@ -1,5 +1,5 @@
 import requests
-from secrets import API_KEY, BASE
+from super_secret_info import *
 
 
 def get_balance(venue):

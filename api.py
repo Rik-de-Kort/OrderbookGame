@@ -1,5 +1,5 @@
 import requests
-from super_secret_info import *
+from super_secret_info import API_KEY, BASE
 
 
 def get_balance(venue):
@@ -16,6 +16,9 @@ def get_orderbook(venue):
         'buy': [(float(price), amount) for price, amount in data['buy']],
         'sell': [(float(price), amount) for price, amount in data['sell']]
     }
+
+def get_trades(venue):
+    response = requests.get(f'{BASE}/{venue}/api/orderbook', headers={'API-Key': API_KEY})
 
 
 def submit_order(venue: str, price: float, quantity: int, direction: str, time_in_force='GTC'):

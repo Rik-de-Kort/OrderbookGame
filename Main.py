@@ -3,8 +3,7 @@ import pandas as pd
 import requests
 from super_secret_info import *
 from itertools import chain
-from datetime import datetime
-
+from datetime import datetime, timedelta
 
 def submit_order(venue: str, price: float, quantity: int, direction: str, time_in_force='GTC'):
     if direction not in ('buy', 'sell'):
@@ -119,6 +118,12 @@ def get_sentiment():
         return "bad", fair_value
 
 
+while true:
+    if datetime.now() + timedelta(0,10) >= get_profits()['next_update']:
+        pre_earnings()
+    if datetime.now() >= get_profits()['next_update'] + timedelta(0,10):
+        post_earnings()
+
 def pre_earnings():
     sentiment=get_sentiment()
     active=get_orders_active("bluelagoon")
@@ -144,8 +149,9 @@ def post_earnings():
     buy = get_orderbook('bluelagoon')["buy"]
     profits = get_profits()
     fair_value = calculate_fair_value(profits)
-    if sell[0]<fair_value:
+    if sell[0][0]<fair_value:
         submit_order('bluelagoon', min(sell)[0] , min(sell)[1], "buy", time_in_force='GTC')
-    if buy[0]>fair_value:
+    if buy[0][0]>fair_value:
         submit_order('bluelagoon', max(buy)[0] , max(buy)[1], "buy", time_in_force='GTC')
 
+post_earnings()

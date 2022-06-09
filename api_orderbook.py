@@ -1,8 +1,5 @@
 import requests
-
-BASE = 'https://orderbookz.com/'
-API_KEY = 'UJOGY'
-
+from super_secret_info import *
 
 def get_orderbook(venue):
     response = requests.get(f'{BASE}/{venue}/api/orderbook', headers={'API-Key': API_KEY})

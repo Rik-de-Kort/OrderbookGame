@@ -3,6 +3,8 @@ from super_secret_info import BASE
 from datetime import datetime
 import bs4
 
+from trader import calculate_fair_value
+
 
 def by_threes(it):
     it = list(it)
@@ -14,6 +16,9 @@ def get_profits():
     response.raise_for_status()
     soup = bs4.BeautifulSoup(response.text, 'html.parser')
 
+    raw_timestamp = soup.find(lambda t: t.has_attr('class') and 'card-body' in t['class']).text
+    timestamp = datetime.strptime(raw_timestamp.strip(), '%d %B %Y at %H:%M:%S')
+
     profit_table = by_threes(soup.find_all('td'))
     result = []
     for row in profit_table:
@@ -21,7 +26,7 @@ def get_profits():
         dt = datetime.strptime(f'{raw_date.text} {raw_time.text}', '%d %B %Y %H:%M:%S')
         profit = float(raw_profit.text)
         result.append({'timestamp': dt, 'profit': profit})
-    return result
+    return {'profits': result, 'next_update': timestamp}
 
 
 def get_news():
@@ -37,5 +42,6 @@ def get_news():
 
 
 if __name__ == '__main__':
+    print(calculate_fair_value(get_profits()['profits']))
     print(get_profits())
     print(get_news())

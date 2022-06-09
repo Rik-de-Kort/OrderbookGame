@@ -137,3 +137,15 @@ def pre_earnings():
             balance = get_balance("bluelagoon")
 
 pre_earnings()
+
+def post_earnings():
+    active = get_orders_active("bluelagoon")
+    sell = get_orderbook('bluelagoon')["sell"]
+    buy = get_orderbook('bluelagoon')["buy"]
+    profits = get_profits()
+    fair_value = calculate_fair_value(profits)
+    if sell[0]<fair_value:
+        submit_order('bluelagoon', min(sell)[0] , min(sell)[1], "buy", time_in_force='GTC')
+    if buy[0]>fair_value:
+        submit_order('bluelagoon', max(buy)[0] , max(buy)[1], "buy", time_in_force='GTC')
+

@@ -121,7 +121,7 @@ def get_sentiment():
 while true:
     if datetime.now() + timedelta(0,10) >= get_profits()['next_update']:
         pre_earnings()
-    if datetime.now() >= get_profits()['next_update'] + timedelta(0,10):
+    if datetime.now() <= get_profits()[0]['timestamp'] + timedelta(0,10):
         post_earnings()
 
 def pre_earnings():

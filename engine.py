@@ -2,7 +2,7 @@ import sqlite3
 import pytest
 from collections import defaultdict
 
-sqlite3.register_converter('bool', lambda x: x == 1)
+sqlite3.register_converter('boolean', lambda v: bool(int(v)))
 sqlite3.register_adapter(bool, int)
 
 

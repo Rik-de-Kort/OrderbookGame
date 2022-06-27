@@ -1,3 +1,4 @@
+from copy import deepcopy
 import sqlite3
 import pytest
 from collections import defaultdict
@@ -12,13 +13,16 @@ class OrderFree:
         result = [{k: item[k] for k in sorted(item.keys())} for item in items]
         return sorted(result, key=lambda d: tuple(d[k] for k in sorted(d.keys())))
 
-    def __init__(self, items: list[dict]):
-        self.items = self.sort(items)
+    def __init__(self, items: list[dict], skip=None):
+        self.skip = [] if skip is None else skip
+        self.items = self.sort([{k: v for k, v in d.items() if k not in self.skip} for d in deepcopy(items)])
 
     def __repr__(self):
         return self.items.__repr__()
 
     def __eq__(self, other: list[dict]):
+        if self.skip:
+            other = [{k: v for k, v in d.items() if k not in self.skip} for d in deepcopy(other)]
         return self.items == self.sort(other)
 
 
@@ -115,7 +119,7 @@ def test_no_counterparty(orderbook):
     limit_order(c, orders[0])
     limit_order(c, orders[1])
     result, _ = read(c)
-    assert result == [orders[0], orders[1]]
+    assert result == OrderFree([orders[0], orders[1]], skip=['timestamp'])
 
 
 def test_buy_order(orderbook):
@@ -132,9 +136,9 @@ def test_buy_order(orderbook):
     book_, accounts_ = read(c)
     assert book_ == [orders[0]] and accounts == OrderFree(accounts_)
 
-    limit_order(c, orders[1])
+    limit_order(c, **orders[1])
     book_, accounts_ = read(c)
     assert (book_ == []) and (
-                accounts_ == OrderFree([{'participant': 0, 'balance': 255}, {'participant': 1, 'balance': -55}]))
+            accounts_ == OrderFree([{'participant': 0, 'balance': 255}, {'participant': 1, 'balance': -55}]))
 
     c.close()

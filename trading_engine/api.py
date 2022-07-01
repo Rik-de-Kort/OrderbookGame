@@ -1,3 +1,4 @@
+from dotenv import load_dotenv
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import jwt, JWTError
@@ -5,20 +6,26 @@ from passlib.context import CryptContext
 from pydantic import BaseModel
 
 from datetime import datetime, timedelta
+import os
+import sqlite3
 from typing import Optional
+
+load_dotenv()
 
 app = FastAPI()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl='token')
 
-user_database = {
-    'rik': {'name': 'rik', 'hashed_password': '$2b$12$IPLrdHW7c.Z9i9qzBfzKMud8W9vuRotGEqqs690IPukZkNhPD9YOi'},
-    'ada': {'name': 'ada', 'hashed_password': '$2b$12$Nq6wV4XoWJRCUc8efmf0IOzYkFR0Rh.D0y8rKd0e7wV9MW2OQrqaC'},
-    'roeland': {'name': 'roeland', 'disabled': True,
-                'hashed_password': '$2b$12$viFC1qCzs429muoJ0RgBeu.oJIr6OvtRUqNvVJ6VIXqpC1wAPr5vS'
-                },
-}
 
-SECRET_KEY = '4f50cf417cadc5adc66a895a9ccd740afc7368f67e419f86e0027a8538ede8af'
+def user_db():
+    conn = sqlite3.connect(os.environ['USER_DB_LOCATION'], check_same_thread=False)
+    c = conn.cursor()
+    try:
+        yield c
+    finally:
+        c.close()
+        conn.close()
+
+
 ALGORITHM = 'HS256'
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
@@ -37,14 +44,14 @@ class User(BaseModel):
     name: str
 
 
-async def get_token_user(token: str = Depends(oauth2_scheme)):
+async def get_token_user(token: str = Depends(oauth2_scheme), user_cursor=Depends(user_db)):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail='Invalid authentication credentials',
         headers={'WWW-Authenticate': 'Bearer'},
     )
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(token, os.environ['SECRET_KEY'], algorithms=[ALGORITHM])
     except JWTError:
         raise credentials_exception
 
@@ -52,40 +59,41 @@ async def get_token_user(token: str = Depends(oauth2_scheme)):
         raise credentials_exception
     username = payload['sub']
 
-    if username not in user_database:
+    matches = user_cursor.execute('select name, hashed_password from users where name=?', (username,)).fetchall()
+    if not matches:
         raise credentials_exception
     else:
-        return User(**user_database[username])
+        name, _ = matches[0]
+        return User(name=name)
 
 
-def authenticate_user(username: str, password: str) -> User:
-    if username not in user_database:
+def authenticate_user(name: str, password: str, user_cursor: sqlite3.Cursor) -> User:
+    matches = user_cursor.execute('select name, hashed_password from users where name=?', (name,)).fetchall()
+    if not matches:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail='Invalid username or password'
         )
 
-    user = user_database[username]
-    if not verify_password(password, user['hashed_password']):
+    name, hashed_password = matches[0]
+    if not verify_password(password, hashed_password):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail='Invalid username or password'
         )
-    return User(**user)
+    return User(name=name)
 
 
 def create_token(data: dict, expires=Optional[timedelta]) -> str:
     to_encode = data.copy()
     expires = timedelta(minutes=15) if expires is None else expires
     to_encode['exp'] = datetime.utcnow() + expires
-    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return jwt.encode(to_encode, os.environ['SECRET_KEY'], algorithm=ALGORITHM)
 
 
 @app.post('/token')
-async def login(form_data: OAuth2PasswordRequestForm = Depends()):
-    user = authenticate_user(form_data.username, form_data.password)
-
-    # Create token!
+async def login(form_data: OAuth2PasswordRequestForm = Depends(), user_cursor=Depends(user_db)):
+    user = authenticate_user(form_data.username, form_data.password, user_cursor)
     token = create_token({'sub': user.name}, expires=timedelta(ACCESS_TOKEN_EXPIRE_MINUTES))
     return {'access_token': token, 'token_type': 'bearer'}
 

@@ -66,12 +66,12 @@ def create_db(location):
 def connect_to_db(location: Optional[Path] = None) -> sqlite3.Connection:
     """
     Connect to a sqlite database with the correct settings.
-    If no argument is passed, this function checks the USER_DB_LOCATION environment variable.
-    If USER_DB_LOCATION is not set, it defaults to opening an in-memory database (:memory:).
+    If no argument is passed, this function checks the DB_LOCATION environment variable.
+    If DB_LOCATION is not set, it defaults to opening an in-memory database (:memory:).
     It's the responsibility of the caller to close the database connection.
     """
     # Take from environment variable if not passed in, fall back on :memory: if that's not present
-    location = os.environ.get('USER_DB_LOCATION', ':memory:') if location is None else location
+    location = os.environ.get('DB_LOCATION', ':memory:') if location is None else location
     conn = sqlite3.connect(location, check_same_thread=False, detect_types=sqlite3.PARSE_DECLTYPES)
     return conn
 

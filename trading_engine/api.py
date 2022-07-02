@@ -1,11 +1,14 @@
 from dotenv import load_dotenv
+from pydantic import BaseModel, Field
 from fastapi import FastAPI, Depends
 
 from auth import User, get_user_for_token
 from auth import create_authenticated_token
 from db_utils import db_cursor, query
+from engine import limit_order
 
 import os
+from typing import Literal
 
 load_dotenv()
 app = FastAPI()
@@ -34,6 +37,25 @@ def balance(c=Depends(db_cursor), user=Depends(get_user_for_token)):
 @app.get('/orders/active')
 def balance(c=Depends(db_cursor), user=Depends(get_user_for_token)):
     return query(c, 'select * from exchange where exchange.participant_id=?', (user.participant_id,))
+
+
+class Order(BaseModel):
+    p: int = Field(..., gt=0)
+    q: int = Field(..., gt=0)
+    d: Literal['buy', 'sell'] = Field(...)
+    tif: Literal['GTC', 'IOC'] = Field(default='GTC')
+
+
+@app.post('/submit')
+def submit(order: Order, c=Depends(db_cursor), user=Depends(get_user_for_token)):
+    timestamp = limit_order(
+        c,
+        participant_id=user.participant_id,
+        price=order.p,
+        amount=(order.q if order.d == 'buy' else -order.q),
+        time_in_force=order.tif
+    )
+    return timestamp
 
 
 @app.get('/me/')

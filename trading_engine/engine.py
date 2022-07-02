@@ -70,7 +70,7 @@ def read(book: sqlite3.Cursor) -> tuple[list[dict], list[dict]]:
     return exchange, accounts
 
 
-def limit_order(c: sqlite3.Cursor, *, participant_id: str, price: int, amount: int, time_in_force='GTC'):
+def limit_order(c: sqlite3.Cursor, *, participant_id: str, price: int, amount: int, time_in_force='GTC') -> int:
     assert time_in_force in ('GTC', 'IOC')
     # print('limit order', participant_id, price, amount, time_in_force)
     # Insert transaction into order book so it gets a timestamp
@@ -127,7 +127,7 @@ def limit_order(c: sqlite3.Cursor, *, participant_id: str, price: int, amount: i
     # Update account balances
     c.executemany('update accounts set balance=balance+? where participant_id=?',
                   [(d, idx) for idx, d in delta.items()])
-
+    c.connection.commit()
     return timestamp
 
 

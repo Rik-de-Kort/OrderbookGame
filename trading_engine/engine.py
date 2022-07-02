@@ -1,10 +1,10 @@
+from collections import defaultdict
 from copy import deepcopy
 import sqlite3
-import pytest
-from collections import defaultdict
 
-sqlite3.register_converter('boolean', lambda v: bool(int(v)))
-sqlite3.register_adapter(bool, int)
+from db_utils import create_db, query
+
+import pytest
 
 
 class OrderFree:
@@ -39,9 +39,9 @@ def make_orderbook():
 
 @pytest.fixture
 def orderbook():
-    book = make_orderbook()
-    yield book
-    book.close()
+    conn = create_db(':memory:')
+    yield conn
+    conn.close()
 
 
 def insert_order(book: sqlite3.Cursor, participant: str, price: int, amount: int):
@@ -65,10 +65,8 @@ def insert_accounts(book: sqlite3.Cursor, accounts: list[dict]):
 
 
 def read(book: sqlite3.Cursor) -> tuple[list[dict], list[dict]]:
-    cols = ('participant', 'price', 'amount', 'timestamp')
-    exchange = [dict(zip(cols, row)) for row in book.execute('select * from exchange').fetchall()]
-    cols = ('participant', 'balance')
-    accounts = [dict(zip(cols, row)) for row in book.execute('select * from accounts').fetchall()]
+    exchange = query(book, 'select * from exchange')
+    accounts = query(book, 'select * from accounts')
     return exchange, accounts
 
 

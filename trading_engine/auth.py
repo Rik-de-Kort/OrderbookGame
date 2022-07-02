@@ -12,19 +12,10 @@ from passlib.context import CryptContext
 from pydantic import BaseModel
 from starlette import status
 
+from db_utils import connect_to_db
+
 load_dotenv()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl=os.environ['TOKEN_URL'])
-
-
-def user_db():
-    conn = sqlite3.connect(os.environ['USER_DB_LOCATION'], check_same_thread=False)
-    c = conn.cursor()
-    try:
-        yield c
-    finally:
-        c.close()
-        conn.close()
-
 
 ALGORITHM = 'HS256'
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
@@ -43,7 +34,7 @@ class User(BaseModel):
     name: str
 
 
-async def get_user_for(token: str = Depends(oauth2_scheme), user_cursor=Depends(user_db)):
+async def get_user_for(token: str = Depends(oauth2_scheme), user_cursor=Depends(connect_to_db)):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail='Invalid authentication credentials',
@@ -58,7 +49,7 @@ async def get_user_for(token: str = Depends(oauth2_scheme), user_cursor=Depends(
         raise credentials_exception
     username = payload['sub']
 
-    matches = user_cursor.execute('select name, hashed_password from users where name=?', (username,)).fetchall()
+    matches = user_cursor.execute('select name, hashed_password from accounts where name=?', (username,)).fetchall()
     if not matches:
         raise credentials_exception
     else:
@@ -90,7 +81,7 @@ def create_token(data: dict, expires: Optional[timedelta] = None) -> str:
     return jwt.encode(to_encode, os.environ['SECRET_KEY'], algorithm=ALGORITHM)
 
 
-def create_authenticated_token(form_data: OAuth2PasswordRequestForm = Depends(), user_cursor=Depends(user_db)):
+def create_authenticated_token(form_data: OAuth2PasswordRequestForm = Depends(), user_cursor=Depends(connect_to_db)):
     user = authenticate_user(form_data.username, form_data.password, user_cursor)
     token = create_token({'sub': user.name})
     return {'access_token': token, 'token_type': 'bearer'}

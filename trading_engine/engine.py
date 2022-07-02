@@ -31,8 +31,8 @@ def make_orderbook():
     c = book.cursor()
     c.execute(
         # Timestamp is logical timestamp
-        'create table exchange (participant integer, price integer, amount integer, timestamp integer primary key autoincrement)')
-    c.execute('create table accounts (participant integer, balance integer)')
+        'create table exchange (participant_id integer, price integer, amount integer, timestamp integer primary key autoincrement)')
+    c.execute('create table accounts (participant_id integer, balance integer)')
     c.close()
     return book
 
@@ -44,15 +44,15 @@ def orderbook():
     conn.close()
 
 
-def insert_order(book: sqlite3.Cursor, participant: str, price: int, amount: int):
+def insert_order(book: sqlite3.Cursor, participant_id: str, price: int, amount: int):
     book.execute(
-        'insert into exchange(participant, price, amount) values(:participant, :price, :amount)',
-        {'participant': participant, 'price': price, 'amount': amount})
+        'insert into exchange(participant_id, price, amount) values(:participant_id, :price, :amount)',
+        {'participant_id': participant_id, 'price': price, 'amount': amount})
     return book.lastrowid
 
 
 def test_insert_order(orderbook):
-    order = {'participant': 0, 'price': 31, 'amount': 5}
+    order = {'participant_id': 0, 'price': 31, 'amount': 5}
     c = orderbook.cursor()
     order['timestamp'] = insert_order(c, **order)
     book, accounts = read(c)
@@ -61,7 +61,7 @@ def test_insert_order(orderbook):
 
 
 def insert_accounts(book: sqlite3.Cursor, accounts: list[dict]):
-    book.executemany('insert into accounts(participant, balance) values(:participant, :balance)', accounts)
+    book.executemany('insert into accounts(participant_id, balance) values(:participant_id, :balance)', accounts)
 
 
 def read(book: sqlite3.Cursor) -> tuple[list[dict], list[dict]]:
@@ -70,21 +70,21 @@ def read(book: sqlite3.Cursor) -> tuple[list[dict], list[dict]]:
     return exchange, accounts
 
 
-def limit_order(c: sqlite3.Cursor, *, participant: str, price: int, amount: int, time_in_force='GTC'):
+def limit_order(c: sqlite3.Cursor, *, participant_id: str, price: int, amount: int, time_in_force='GTC'):
     assert time_in_force in ('GTC', 'IOC')
-    # print('limit order', participant, price, amount, time_in_force)
+    # print('limit order', participant_id, price, amount, time_in_force)
     # Insert transaction into order book so it gets a timestamp
-    timestamp = insert_order(c, participant=participant, price=price, amount=amount)
+    timestamp = insert_order(c, participant_id=participant_id, price=price, amount=amount)
 
     # Fetch matching transactions from the order c
     if amount > 0:
         matching = c.execute(
-            'select participant, timestamp, amount, price from exchange where amount < 0 and price <= ? order by price asc, timestamp asc',
+            'select participant_id, timestamp, amount, price from exchange where amount < 0 and price <= ? order by price asc, timestamp asc',
             (price,)
         ).fetchall()
     else:
         matching = c.execute(
-            'select participant, timestamp, amount, price from exchange where amount > 0 and price >= ? order by price desc, timestamp asc',
+            'select participant_id, timestamp, amount, price from exchange where amount > 0 and price >= ? order by price desc, timestamp asc',
             (price,)
         ).fetchall()
 
@@ -98,13 +98,13 @@ def limit_order(c: sqlite3.Cursor, *, participant: str, price: int, amount: int,
             remaining += counter_amount
 
             delta[idx] -= counter_amount * price
-            delta[participant] += counter_amount * price
+            delta[participant_id] += counter_amount * price
 
             fulfilled.append(ts)
         elif remaining == -counter_amount:
             # "Eat" this order, appetite fulfilled
             delta[idx] -= counter_amount * price
-            delta[participant] += counter_amount * price
+            delta[participant_id] += counter_amount * price
 
             fulfilled.append(ts)
             fulfilled.append(timestamp)
@@ -125,7 +125,8 @@ def limit_order(c: sqlite3.Cursor, *, participant: str, price: int, amount: int,
     c.executemany('delete from exchange where timestamp=?', [(ts,) for ts in fulfilled])
 
     # Update account balances
-    c.executemany('update accounts set balance=balance+? where participant=?', [(d, idx) for idx, d in delta.items()])
+    c.executemany('update accounts set balance=balance+? where participant_id=?',
+                  [(d, idx) for idx, d in delta.items()])
 
     return timestamp
 
@@ -136,8 +137,8 @@ def cancel_order(c: sqlite3.Cursor, timestamp: int):
 
 def test_no_counterparty(orderbook):
     orders = [
-        {'participant': 0, 'price': 31, 'amount': 5},
-        {'participant': 1, 'price': 31, 'amount': 5},
+        {'participant_id': 0, 'price': 31, 'amount': 5},
+        {'participant_id': 1, 'price': 31, 'amount': 5},
     ]
     c = orderbook.cursor()
     orders[0]['timestamp'] = limit_order(c, **orders[0])
@@ -148,10 +149,10 @@ def test_no_counterparty(orderbook):
 
 def test_buy_order(orderbook):
     orders = [
-        {'participant': 0, 'price': 31, 'amount': -5},
-        {'participant': 1, 'price': 31, 'amount': 5},
+        {'participant_id': 0, 'price': 31, 'amount': -5},
+        {'participant_id': 1, 'price': 31, 'amount': 5},
     ]
-    accounts = [{'participant': 0, 'balance': 100}, {'participant': 1, 'balance': 100}]
+    accounts = [{'participant_id': 0, 'balance': 100}, {'participant_id': 1, 'balance': 100}]
 
     c = orderbook.cursor()
     insert_accounts(orderbook, accounts)
@@ -163,17 +164,17 @@ def test_buy_order(orderbook):
     orders[1]['timestamp'] = limit_order(c, **orders[1])
     book_, accounts_ = read(c)
     assert (book_ == []) and (
-            accounts_ == OrderFree([{'participant': 0, 'balance': 255}, {'participant': 1, 'balance': -55}]))
+            accounts_ == OrderFree([{'participant_id': 0, 'balance': 255}, {'participant_id': 1, 'balance': -55}]))
 
     c.close()
 
 
 def test_sell_order(orderbook):
     orders = [
-        {'participant': 0, 'price': 31, 'amount': 5},
-        {'participant': 1, 'price': 31, 'amount': -5},
+        {'participant_id': 0, 'price': 31, 'amount': 5},
+        {'participant_id': 1, 'price': 31, 'amount': -5},
     ]
-    accounts = [{'participant': 0, 'balance': 100}, {'participant': 1, 'balance': 100}]
+    accounts = [{'participant_id': 0, 'balance': 100}, {'participant_id': 1, 'balance': 100}]
 
     c = orderbook.cursor()
     insert_accounts(orderbook, accounts)
@@ -185,17 +186,17 @@ def test_sell_order(orderbook):
     orders[1]['timestamp'] = limit_order(c, **orders[1])
     book_, accounts_ = read(c)
     assert (book_ == []) and (
-            accounts_ == OrderFree([{'participant': 0, 'balance': -55}, {'participant': 1, 'balance': 255}]))
+            accounts_ == OrderFree([{'participant_id': 0, 'balance': -55}, {'participant_id': 1, 'balance': 255}]))
 
     c.close()
 
 
 def test_ioc_order(orderbook):
     orders = [
-        {'participant': 0, 'price': 31, 'amount': -5},
-        {'participant': 1, 'price': 31, 'amount': 10, 'time_in_force': 'IOC'},
+        {'participant_id': 0, 'price': 31, 'amount': -5},
+        {'participant_id': 1, 'price': 31, 'amount': 10, 'time_in_force': 'IOC'},
     ]
-    accounts = [{'participant': 0, 'balance': 100}, {'participant': 1, 'balance': 100}]
+    accounts = [{'participant_id': 0, 'balance': 100}, {'participant_id': 1, 'balance': 100}]
 
     c = orderbook.cursor()
     insert_accounts(c, accounts)
@@ -204,18 +205,18 @@ def test_ioc_order(orderbook):
     orders[1]['timestamp'] = limit_order(c, **orders[1])
     book_, accounts_ = read(c)
     assert (book_ == []) \
-           and accounts_ == OrderFree([{'participant': 0, 'balance': 255}, {'participant': 1, 'balance': -55}])
+           and accounts_ == OrderFree([{'participant_id': 0, 'balance': 255}, {'participant_id': 1, 'balance': -55}])
 
 
 def test_price_priority(orderbook):
     orders = [
-        {'participant': 0, 'price': 32, 'amount': -5},
-        {'participant': 1, 'price': 31, 'amount': -5},
-        {'participant': 2, 'price': 32, 'amount': 5},
+        {'participant_id': 0, 'price': 32, 'amount': -5},
+        {'participant_id': 1, 'price': 31, 'amount': -5},
+        {'participant_id': 2, 'price': 32, 'amount': 5},
     ]
-    accounts = [{'participant': 0, 'balance': 100},
-                {'participant': 1, 'balance': 100},
-                {'participant': 2, 'balance': 100}]
+    accounts = [{'participant_id': 0, 'balance': 100},
+                {'participant_id': 1, 'balance': 100},
+                {'participant_id': 2, 'balance': 100}]
 
     c = orderbook.cursor()
     insert_accounts(c, accounts)
@@ -226,20 +227,20 @@ def test_price_priority(orderbook):
 
     book_, accounts_ = read(c)
     assert (book_ == [orders[0]]) \
-           and (accounts_ == OrderFree([{'participant': 0, 'balance': 100},
-                                        {'participant': 1, 'balance': 100 + 31 * 5},
-                                        {'participant': 2, 'balance': 100 - 31 * 5}]))
+           and (accounts_ == OrderFree([{'participant_id': 0, 'balance': 100},
+                                        {'participant_id': 1, 'balance': 100 + 31 * 5},
+                                        {'participant_id': 2, 'balance': 100 - 31 * 5}]))
 
 
 def test_time_priority(orderbook):
     orders = [
-        {'participant': 0, 'price': 31, 'amount': -5},
-        {'participant': 1, 'price': 31, 'amount': -5},
-        {'participant': 2, 'price': 32, 'amount': 5},
+        {'participant_id': 0, 'price': 31, 'amount': -5},
+        {'participant_id': 1, 'price': 31, 'amount': -5},
+        {'participant_id': 2, 'price': 32, 'amount': 5},
     ]
-    accounts = [{'participant': 0, 'balance': 100},
-                {'participant': 1, 'balance': 100},
-                {'participant': 2, 'balance': 100}]
+    accounts = [{'participant_id': 0, 'balance': 100},
+                {'participant_id': 1, 'balance': 100},
+                {'participant_id': 2, 'balance': 100}]
 
     c = orderbook.cursor()
     insert_accounts(c, accounts)
@@ -250,6 +251,6 @@ def test_time_priority(orderbook):
 
     book_, accounts_ = read(c)
     assert (book_ == [orders[1]]) \
-           and (accounts_ == OrderFree([{'participant': 0, 'balance': 100 + 31 * 5},
-                                        {'participant': 1, 'balance': 100},
-                                        {'participant': 2, 'balance': 100 - 31 * 5}]))
+           and (accounts_ == OrderFree([{'participant_id': 0, 'balance': 100 + 31 * 5},
+                                        {'participant_id': 1, 'balance': 100},
+                                        {'participant_id': 2, 'balance': 100 - 31 * 5}]))

@@ -11,24 +11,24 @@ def create_mock_db(location: Path | str) -> sqlite3.Connection:
     conn = create_db(location)
     accounts = [
         {
-            'participant': 0,
+            'participant_id': 0,
             'name': 'rik',
             'hashed_password': '$2b$12$IPLrdHW7c.Z9i9qzBfzKMud8W9vuRotGEqqs690IPukZkNhPD9YOi',  # foo123
             'balance': 100
         },
         {
-            'participant': 1,
+            'participant_id': 1,
             'name': 'ada',
             'hashed_password': '$2b$12$Nq6wV4XoWJRCUc8efmf0IOzYkFR0Rh.D0y8rKd0e7wV9MW2OQrqaC',  # bar123
             'balance': 100,
         }
     ]
     conn.executemany(
-        'insert into auth(participant, name, hashed_password) values (:participant, :name, :hashed_password)',
+        'insert into auth(participant_id, name, hashed_password) values (:participant_id, :name, :hashed_password)',
         accounts
     )
     conn.executemany(
-        'insert into accounts(participant, balance) values (:participant, :balance)', accounts
+        'insert into accounts(participant_id, balance) values (:participant_id, :balance)', accounts
     )
     conn.commit()
     return conn
@@ -41,7 +41,7 @@ def create_db(location):
     conn = connect_to_db(location)
     conn.execute(
         'create table exchange ('
-        '   participant integer,'
+        '   participant_id integer,'
         '   price integer,'
         '   amount integer,'
         '   timestamp integer primary key autoincrement'
@@ -49,13 +49,13 @@ def create_db(location):
     )
     conn.execute(
         'create table accounts ('
-        '  participant int primary key,'
+        '  participant_id int primary key,'
         '  balance integer default 0 not null'
         ')'
     )
     conn.execute(
         'create table auth ('
-        '  participant int primary key,'
+        '  participant_id int primary key,'
         '  name text unique not null,'
         '  hashed_password text not null'
         ')'
@@ -76,6 +76,15 @@ def connect_to_db(location: Optional[Path] = None) -> sqlite3.Connection:
     return conn
 
 
+def db_cursor() -> sqlite3.Cursor:
+    """db_connection for use with FastAPI. Otherwise we're allowing callers to connect to arbitrary databases."""
+    try:
+         conn = connect_to_db(None)
+         yield conn.cursor()
+    finally:
+        conn.close()
+
+
 def query(c: sqlite3.Connection | sqlite3.Cursor, sql: str, data=None) -> list[dict[str, Any]]:
     if data is None:
         result = c.execute(sql).fetchall()
@@ -91,4 +100,5 @@ if __name__ == '__main__':
 
     load_dotenv()
     conn = create_mock_db(Path(os.environ['DB_LOCATION']))
+    conn.commit()
     conn.close()

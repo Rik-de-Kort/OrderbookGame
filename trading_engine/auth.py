@@ -12,7 +12,7 @@ from passlib.context import CryptContext
 from pydantic import BaseModel
 from starlette import status
 
-from db_utils import connect_to_db
+from db_utils import db_cursor, query
 
 load_dotenv()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl=os.environ['TOKEN_URL'])
@@ -32,9 +32,10 @@ def verify_password(plaintext: str, hashed: str) -> bool:
 
 class User(BaseModel):
     name: str
+    participant_id: int
 
 
-async def get_user_for(token: str = Depends(oauth2_scheme), user_cursor=Depends(connect_to_db)):
+async def get_user_for_token(token: str = Depends(oauth2_scheme), c=Depends(db_cursor)):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail='Invalid authentication credentials',
@@ -49,29 +50,29 @@ async def get_user_for(token: str = Depends(oauth2_scheme), user_cursor=Depends(
         raise credentials_exception
     username = payload['sub']
 
-    matches = user_cursor.execute('select name, hashed_password from accounts where name=?', (username,)).fetchall()
+    matches = query(c, 'select participant_id, name, hashed_password from auth where name=?', (username,))
     if not matches:
         raise credentials_exception
     else:
-        name, _ = matches[0]
-        return User(name=name)
+        match = matches[0]
+        return User(participant_id=match['participant_id'], name=match['name'])
 
 
-def authenticate_user(name: str, password: str, user_cursor: sqlite3.Cursor) -> User:
-    matches = user_cursor.execute('select name, hashed_password from users where name=?', (name,)).fetchall()
+def authenticate_user(name: str, password: str, c: sqlite3.Cursor) -> User:
+    matches = query(c, 'select participant_id, name, hashed_password from auth where name=?', (name,))
     if not matches:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail='Invalid username or password'
         )
 
-    name, hashed_password = matches[0]
-    if not verify_password(password, hashed_password):
+    match = matches[0]
+    if not verify_password(password, match['hashed_password']):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail='Invalid username or password'
         )
-    return User(name=name)
+    return User(participant_id=match['participant_id'], name=name)
 
 
 def create_token(data: dict, expires: Optional[timedelta] = None) -> str:
@@ -81,7 +82,7 @@ def create_token(data: dict, expires: Optional[timedelta] = None) -> str:
     return jwt.encode(to_encode, os.environ['SECRET_KEY'], algorithm=ALGORITHM)
 
 
-def create_authenticated_token(form_data: OAuth2PasswordRequestForm = Depends(), user_cursor=Depends(connect_to_db)):
-    user = authenticate_user(form_data.username, form_data.password, user_cursor)
+def create_authenticated_token(form_data: OAuth2PasswordRequestForm = Depends(), c=Depends(db_cursor)):
+    user = authenticate_user(form_data.username, form_data.password, c)
     token = create_token({'sub': user.name})
     return {'access_token': token, 'token_type': 'bearer'}

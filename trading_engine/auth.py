@@ -4,13 +4,12 @@ from datetime import timedelta, datetime
 from typing import Optional
 
 from dotenv import load_dotenv
-from fastapi import Depends, HTTPException
+from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from fastapi.security import OAuth2PasswordRequestForm
 from jose import jwt, JWTError
 from passlib.context import CryptContext
 from pydantic import BaseModel, SecretStr
-from starlette import status
 
 from db_utils import db_cursor, query
 

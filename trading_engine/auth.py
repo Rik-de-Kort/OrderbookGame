@@ -75,6 +75,24 @@ def authenticate_user(name: str, password: str, c: sqlite3.Cursor) -> User:
     return User(participant_id=match['participant_id'], name=name)
 
 
+def create_user(name: str, password: str, c=Depends(db_cursor)) -> User:
+    # Todo: take hashed password
+    matches = query(c, 'select participant_id, name, hashed_password from auth where name=?', (name,))
+    if matches:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f'This user already exists!'
+        )
+    participant_id_wrapped = query(
+        c,
+        'insert into auth(name, hashed_password) values (?, ?) returning participant_id, name',
+        (name, hash_password(password))
+    )
+    print(participant_id_wrapped)
+    c.connection.commit()
+    return User(**participant_id_wrapped[0])
+
+
 def create_token(data: dict, expires: Optional[timedelta] = None) -> str:
     to_encode = data.copy()
     expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES) if expires is None else expires

@@ -3,7 +3,7 @@ from pydantic import BaseModel, Field
 from fastapi import FastAPI, Depends, status
 
 from auth import User, get_user_for_token, HTTPException
-from auth import create_authenticated_token
+from auth import create_authenticated_token, create_user
 from db_utils import db_cursor, query
 from engine import limit_order
 
@@ -79,6 +79,11 @@ def cancel_all(c=Depends(db_cursor), user=Depends(get_user_for_token)):
     c.connection.commit()
     cancelled = [ts for ts, *_ in cancelled]
     return f'Cancelled {len(cancelled)} orders: {cancelled}.'
+
+
+@app.post('/signup')
+def sign_up(user: User = Depends(create_user)):
+    return user
 
 
 @app.get('/me')

@@ -49,13 +49,13 @@ def create_db(location):
     )
     conn.execute(
         'create table accounts ('
-        '  participant_id int primary key,'
+        '  participant_id integer primary key,'
         '  balance integer default 0 not null'
         ')'
     )
     conn.execute(
         'create table auth ('
-        '  participant_id int primary key,'
+        '  participant_id integer primary key,'
         '  name text unique not null,'
         '  hashed_password text not null'
         ')'

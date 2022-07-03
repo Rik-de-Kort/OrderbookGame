@@ -22,7 +22,7 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 30
 password_context = CryptContext(schemes=['bcrypt'], deprecated='auto')
 
 
-def hash(pwd: str) -> str:
+def hash_password(pwd: str) -> str:
     return password_context.hash(pwd)
 
 
@@ -35,7 +35,7 @@ class User(BaseModel):
     participant_id: int
 
 
-async def get_user_for_token(token: str = Depends(oauth2_scheme), c=Depends(db_cursor)):
+async def get_user_for_token(c=Depends(db_cursor), token: str = Depends(oauth2_scheme)):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail='Invalid authentication credentials',
@@ -58,7 +58,7 @@ async def get_user_for_token(token: str = Depends(oauth2_scheme), c=Depends(db_c
         return User(participant_id=match['participant_id'], name=match['name'])
 
 
-def authenticate_user(name: str, password: str, c: sqlite3.Cursor) -> User:
+def authenticate_user(c: sqlite3.Cursor, name: str, password: str) -> User:
     matches = query(c, 'select participant_id, name, hashed_password from auth where name=?', (name,))
     if not matches:
         raise HTTPException(
@@ -100,7 +100,7 @@ def create_token(data: dict, expires: Optional[timedelta] = None) -> str:
     return jwt.encode(to_encode, os.environ['SECRET_KEY'], algorithm=ALGORITHM)
 
 
-def create_authenticated_token(form_data: OAuth2PasswordRequestForm = Depends(), c=Depends(db_cursor)):
-    user = authenticate_user(form_data.username, form_data.password, c)
+def create_authenticated_token(c=Depends(db_cursor), form_data: OAuth2PasswordRequestForm = Depends()):
+    user = authenticate_user(c, form_data.username, form_data.password)
     token = create_token({'sub': user.name})
     return {'access_token': token, 'token_type': 'bearer'}

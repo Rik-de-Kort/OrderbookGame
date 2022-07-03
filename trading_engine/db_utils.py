@@ -79,13 +79,13 @@ def connect_to_db(location: Optional[Path] = None) -> sqlite3.Connection:
 def db_cursor() -> sqlite3.Cursor:
     """db_connection for use with FastAPI. Otherwise we're allowing callers to connect to arbitrary databases."""
     try:
-         conn = connect_to_db(None)
-         yield conn.cursor()
+        conn = connect_to_db(None)
+        yield conn.cursor()
     finally:
         conn.close()
 
 
-def query(c: sqlite3.Connection | sqlite3.Cursor, sql: str, data=None) -> list[dict[str, Any]]:
+def query(c: sqlite3.Connection | sqlite3.Cursor, sql: str, data: tuple = None) -> list[dict[str, Any]]:
     if data is None:
         result = c.execute(sql).fetchall()
     else:

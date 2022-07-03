@@ -88,7 +88,6 @@ def create_user(name: str, password: SecretStr, c=Depends(db_cursor)) -> User:
         'insert into auth(name, hashed_password) values (?, ?) returning participant_id, name',
         (name, hash_password(password.get_secret_value()))
     )
-    print(participant_id_wrapped)
     c.connection.commit()
     return User(**participant_id_wrapped[0])
 

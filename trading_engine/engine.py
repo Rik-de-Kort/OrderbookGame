@@ -131,10 +131,6 @@ def limit_order(c: sqlite3.Cursor, *, participant_id: str, price: int, amount: i
     return timestamp
 
 
-def cancel_order(c: sqlite3.Cursor, timestamp: int):
-    c.execute('delete from exchange where timestamp=?', (timestamp,))
-
-
 def test_no_counterparty(orderbook):
     orders = [
         {'participant_id': 0, 'price': 31, 'amount': 5},

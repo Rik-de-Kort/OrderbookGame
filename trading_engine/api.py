@@ -1,8 +1,8 @@
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI, Depends, status
 
-from auth import User, get_user_for_token
+from auth import User, get_user_for_token, HTTPException
 from auth import create_authenticated_token
 from db_utils import db_cursor, query
 from engine import limit_order
@@ -56,6 +56,29 @@ def submit(order: Order, c=Depends(db_cursor), user=Depends(get_user_for_token))
         time_in_force=order.tif
     )
     return timestamp
+
+
+@app.post('/cancel')
+def cancel(timestamp: int, c=Depends(db_cursor), user=Depends(get_user_for_token)):
+    # Validate user has right to cancel
+    cancelled = c.execute(
+        'delete from exchange where participant_id=? and timestamp=? returning timestamp',
+        (user.participant_id, timestamp)
+    ).fetchall()
+    if not cancelled:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, f'User {user} does not own order {timestamp}')
+    return f'Cancelled order {timestamp}.'
+
+
+@app.post('/cancel/all')
+def cancel_all(c=Depends(db_cursor), user=Depends(get_user_for_token)):
+    cancelled = c.execute(
+        'delete from exchange where participant_id=? returning timestamp',
+        (user.participant_id,)
+    ).fetchall()
+    c.connection.commit()
+    cancelled = [ts for ts, *_ in cancelled]
+    return f'Cancelled {len(cancelled)} orders: {cancelled}.'
 
 
 @app.get('/me/')

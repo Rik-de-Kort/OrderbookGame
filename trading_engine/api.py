@@ -19,7 +19,7 @@ def home():
     return 'Welcome to the orderbook game!'
 
 
-@app.get('/orderbook/')
+@app.get('/orderbook')
 def orderbook(c=Depends(db_cursor)):
     orderbook = query(c, 'select * from exchange')
     return {'data': {
@@ -28,14 +28,14 @@ def orderbook(c=Depends(db_cursor)):
     }}
 
 
-@app.get('/balance/')
+@app.get('/balance')
 def balance(c=Depends(db_cursor), user=Depends(get_user_for_token)):
     balance = query(c, 'select balance from accounts natural join auth where auth.name=?', (user.name,))
     return balance[0]
 
 
 @app.get('/orders/active')
-def balance(c=Depends(db_cursor), user=Depends(get_user_for_token)):
+def active_orders(c=Depends(db_cursor), user=Depends(get_user_for_token)):
     return query(c, 'select * from exchange where exchange.participant_id=?', (user.participant_id,))
 
 
@@ -81,7 +81,7 @@ def cancel_all(c=Depends(db_cursor), user=Depends(get_user_for_token)):
     return f'Cancelled {len(cancelled)} orders: {cancelled}.'
 
 
-@app.get('/me/')
+@app.get('/me')
 def me(user: User = Depends(get_user_for_token)):
     return user
 

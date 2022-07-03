@@ -9,7 +9,7 @@ from fastapi.security import OAuth2PasswordBearer
 from fastapi.security import OAuth2PasswordRequestForm
 from jose import jwt, JWTError
 from passlib.context import CryptContext
-from pydantic import BaseModel
+from pydantic import BaseModel, SecretStr
 from starlette import status
 
 from db_utils import db_cursor, query
@@ -75,7 +75,7 @@ def authenticate_user(c: sqlite3.Cursor, name: str, password: str) -> User:
     return User(participant_id=match['participant_id'], name=name)
 
 
-def create_user(name: str, password: str, c=Depends(db_cursor)) -> User:
+def create_user(name: str, password: SecretStr, c=Depends(db_cursor)) -> User:
     # Todo: take hashed password
     matches = query(c, 'select participant_id, name, hashed_password from auth where name=?', (name,))
     if matches:
@@ -86,7 +86,7 @@ def create_user(name: str, password: str, c=Depends(db_cursor)) -> User:
     participant_id_wrapped = query(
         c,
         'insert into auth(name, hashed_password) values (?, ?) returning participant_id, name',
-        (name, hash_password(password))
+        (name, hash_password(password.get_secret_value()))
     )
     print(participant_id_wrapped)
     c.connection.commit()

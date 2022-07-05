@@ -7,7 +7,8 @@ It's written with FastAPI and SQLite.
 Todo list:
 - [ ] Keep an event log of what happened at the exchange
 - [ ] Create a trades endpoint to view past trades
-- [ ] Set up rate limiting for the backend
+- [x] Set up rate limiting for the backend
+- [ ] Integration tests for the backend
 - [ ] Deploy somewhere
 
 Backlog:

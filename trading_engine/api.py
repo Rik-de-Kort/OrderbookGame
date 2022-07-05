@@ -1,17 +1,41 @@
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field
-from fastapi import FastAPI, Depends, status
+from fastapi import FastAPI, Depends, status, Request
 
 from auth import User, get_user_for_token, HTTPException
 from auth import create_authenticated_token, create_user
 from db_utils import db_cursor, query
 from engine import limit_order
 
+from datetime import datetime
 import os
 from typing import Literal
 
+EPOCH = datetime.now()
 load_dotenv()
-app = FastAPI()
+
+
+def rate_limit(request: Request, c=Depends(db_cursor), n_requests=5, n_seconds=1):
+    """Use ratelimit table to limit number of requests to n_requests per n_seconds."""
+    request_timestamp = (datetime.now() - EPOCH).total_seconds()
+    request_ip = request.client.host
+
+    requests_in_last_second = query(
+        c,
+        'select count(rowid) from ratelimit where ip=? and timestamp >= ?',
+        (request_ip, request_timestamp - n_seconds)
+    )[0]['count(rowid)']
+    if requests_in_last_second >= n_requests:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail='Exceeded 5 requests per second, try again later.'
+        )
+    c.execute('insert into ratelimit(ip, timestamp) values (?, ?)', (request_ip, request_timestamp))
+    c.execute('delete from ratelimit where ip = ? and timestamp < ?', (request_ip, request_timestamp - 1))
+    c.connection.commit()
+
+
+app = FastAPI(dependencies=[Depends(rate_limit)])
 
 
 @app.get('/')

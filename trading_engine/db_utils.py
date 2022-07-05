@@ -60,6 +60,13 @@ def create_db(location):
         '  hashed_password text not null'
         ')'
     )
+    conn.execute(
+        'create table ratelimit ('
+        '  rowid integer primary key,'
+        '  ip text,'
+        '  timestamp real'
+        ')'
+    )
     return conn
 
 

@@ -1,5 +1,7 @@
 from collections import defaultdict
 from copy import deepcopy
+from datetime import datetime
+import json
 import sqlite3
 
 from db_utils import create_db, query
@@ -82,6 +84,7 @@ def limit_order(c: sqlite3.Cursor, *, participant_id: str, price: int, amount: i
     # Fulfill transactions in turn
     remaining = amount
     delta = defaultdict(lambda: 0)
+    log = []
     fulfilled = []
     for idx, ts, counter_amount, price in matching:
         if remaining > -counter_amount:
@@ -92,6 +95,7 @@ def limit_order(c: sqlite3.Cursor, *, participant_id: str, price: int, amount: i
             delta[participant_id] += counter_amount * price
 
             fulfilled.append(ts)
+            log.append((idx, counter_amount, price))
         elif remaining == -counter_amount:
             # "Eat" this order, appetite fulfilled
             delta[idx] -= counter_amount * price
@@ -99,11 +103,13 @@ def limit_order(c: sqlite3.Cursor, *, participant_id: str, price: int, amount: i
 
             fulfilled.append(ts)
             fulfilled.append(timestamp)
+            log.append((idx, counter_amount, price))
             break
         elif remaining < -counter_amount:
             # Appetite fulfilled, but this order too big
             c.execute('update exchange set amount=? where logical_timestamp=?', (-counter_amount - remaining, ts))
             fulfilled.append(timestamp)
+            log.append((idx, counter_amount, price))
             break
         else:
             raise Exception('Unexpected logic error')
@@ -119,6 +125,21 @@ def limit_order(c: sqlite3.Cursor, *, participant_id: str, price: int, amount: i
     c.executemany('update accounts set balance=balance+? where participant_id=?',
                   [(d, idx) for idx, d in delta.items()])
     c.connection.commit()
+
+    log = [
+        {
+            'type': 'trade',
+            'buyer': participant_id,
+            'seller': idx,
+            'amount': -counter_amount if amount > 0 else counter_amount,
+            'price': price
+        }
+        for idx, counter_amount, price in log
+    ]
+    c.executemany('insert into log(event, timestamp) values (?, ?)',
+                  [(json.dumps(item), datetime.now()) for item in log])
+    c.connection.commit()
+
     return timestamp
 
 

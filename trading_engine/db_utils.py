@@ -1,10 +1,12 @@
+import json
+import os
 from pathlib import Path
 import sqlite3
-import os
 from typing import Optional, Any
 
 sqlite3.register_converter('boolean', lambda v: bool(int(v)))
 sqlite3.register_adapter(bool, int)
+sqlite3.register_converter('json', json.loads)
 
 
 def create_mock_db(location: Path | str) -> sqlite3.Connection:
@@ -50,6 +52,12 @@ def create_db(location):
         '   price integer,'
         '   amount integer,'
         '   logical_timestamp integer primary key autoincrement'
+        ')'
+    )
+    conn.execute(
+        'create table log ('
+        '  event json,'
+        '  timestamp text'
         ')'
     )
     conn.execute(

@@ -55,6 +55,11 @@ def orderbook(c=Depends(db_cursor)):
     }}
 
 
+@app.get('/trades')
+def trades(c=Depends(db_cursor)):
+    return query(c, 'select * from log where event ->> \'type\' = \'trade\'')
+
+
 @app.get('/balance')
 def balance(c=Depends(db_cursor), user=Depends(get_user_for_token)):
     return query(c, 'select balance from accounts natural join auth where auth.name=?', (user.name,))[0]

@@ -5,8 +5,8 @@ So far, I have a working trading engine where you can sign up, log in, and play 
 It's written with FastAPI and SQLite.
 
 Todo list:
-- [ ] Keep an event log of what happened at the exchange
-- [ ] Create a trades endpoint to view past trades
+- [x] Keep an event log of what happened at the exchange
+- [x] Create a trades endpoint to view past trades
 - [x] Set up rate limiting for the backend
 - [ ] Integration tests for the backend
 - [ ] Deploy somewhere

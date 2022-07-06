@@ -22,7 +22,7 @@ def rate_limit(request: Request, c=Depends(db_cursor), n_requests=5, n_seconds=1
 
     requests_in_last_second = query(
         c,
-        'select count(rowid) from ratelimit where ip=? and timestamp >= ?',
+        'select count(rowid) from ratelimit where ip=? and relative_timestamp >= ?',
         (request_ip, request_timestamp - n_seconds)
     )[0]['count(rowid)']
     if requests_in_last_second >= n_requests:
@@ -30,8 +30,8 @@ def rate_limit(request: Request, c=Depends(db_cursor), n_requests=5, n_seconds=1
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail='Exceeded 5 requests per second, try again later.'
         )
-    c.execute('insert into ratelimit(ip, timestamp) values (?, ?)', (request_ip, request_timestamp))
-    c.execute('delete from ratelimit where ip = ? and timestamp < ?', (request_ip, request_timestamp - 1))
+    c.execute('insert into ratelimit(ip, relative_timestamp) values (?, ?)', (request_ip, request_timestamp))
+    c.execute('delete from ratelimit where ip = ? and relative_timestamp < ?', (request_ip, request_timestamp - 1))
     c.connection.commit()
 
 
@@ -83,21 +83,21 @@ def submit(order: Order, c=Depends(db_cursor), user=Depends(get_user_for_token))
 
 
 @app.post('/cancel')
-def cancel(timestamp: int, c=Depends(db_cursor), user=Depends(get_user_for_token)):
+def cancel(logical_timestamp: int, c=Depends(db_cursor), user=Depends(get_user_for_token)):
     # Validate user has right to cancel
     cancelled = c.execute(
-        'delete from exchange where participant_id=? and timestamp=? returning timestamp',
-        (user.participant_id, timestamp)
+        'delete from exchange where participant_id=? and logical_timestamp=? returning logical_timestamp',
+        (user.participant_id, logical_timestamp)
     ).fetchall()
     if not cancelled:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, f'User {user} does not own order {timestamp}')
-    return f'Cancelled order {timestamp}.'
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, f'User {user} does not own order {logical_timestamp}')
+    return f'Cancelled order {logical_timestamp}.'
 
 
 @app.post('/cancel/all')
 def cancel_all(c=Depends(db_cursor), user=Depends(get_user_for_token)):
     cancelled = c.execute(
-        'delete from exchange where participant_id=? returning timestamp',
+        'delete from exchange where participant_id=? returning logical_timestamp',
         (user.participant_id,)
     ).fetchall()
     c.connection.commit()

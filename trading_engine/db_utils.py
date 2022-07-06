@@ -39,12 +39,16 @@ def create_db(location):
         location = Path(location) if isinstance(location, str) else location
         if location.exists(): location.unlink()
     conn = connect_to_db(location)
+    # Terminology:
+    # - A logical timestamp is an integer which can be used to order events
+    # - A relative timestamp is a real that indicates a certain offset from some epoch
+    # - A (normal) timestamp is a specific point in time, local to the server
     conn.execute(
         'create table exchange ('
         '   participant_id integer,'
         '   price integer,'
         '   amount integer,'
-        '   timestamp integer primary key autoincrement'
+        '   logical_timestamp integer primary key autoincrement'
         ')'
     )
     conn.execute(
@@ -64,7 +68,7 @@ def create_db(location):
         'create table ratelimit ('
         '  rowid integer primary key,'
         '  ip text,'
-        '  timestamp real'
+        '  relative_timestamp real'
         ')'
     )
     return conn

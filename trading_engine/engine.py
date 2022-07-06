@@ -26,17 +26,6 @@ class OrderFree:
         return self.items == self.sort(other)
 
 
-def make_orderbook():
-    book = sqlite3.connect(':memory:', detect_types=sqlite3.PARSE_DECLTYPES, )
-    c = book.cursor()
-    c.execute(
-        # Timestamp is logical timestamp
-        'create table exchange (participant_id integer, price integer, amount integer, timestamp integer primary key autoincrement)')
-    c.execute('create table accounts (participant_id integer, balance integer)')
-    c.close()
-    return book
-
-
 @pytest.fixture
 def orderbook():
     conn = create_db(':memory:')
@@ -54,7 +43,7 @@ def insert_order(book: sqlite3.Cursor, participant_id: str, price: int, amount: 
 def test_insert_order(orderbook):
     order = {'participant_id': 0, 'price': 31, 'amount': 5}
     c = orderbook.cursor()
-    order['timestamp'] = insert_order(c, **order)
+    order['logical_timestamp'] = insert_order(c, **order)
     book, accounts = read(c)
     c.close()
     assert book == [order]
@@ -79,12 +68,14 @@ def limit_order(c: sqlite3.Cursor, *, participant_id: str, price: int, amount: i
     # Fetch matching transactions from the order c
     if amount > 0:
         matching = c.execute(
-            'select participant_id, timestamp, amount, price from exchange where amount < 0 and price <= ? order by price asc, timestamp asc',
+            'select participant_id, logical_timestamp, amount, price '
+            'from exchange where amount < 0 and price <= ? order by price asc, logical_timestamp asc',
             (price,)
         ).fetchall()
     else:
         matching = c.execute(
-            'select participant_id, timestamp, amount, price from exchange where amount > 0 and price >= ? order by price desc, timestamp asc',
+            'select participant_id, logical_timestamp, amount, price '
+            'from exchange where amount > 0 and price >= ? order by price desc, logical_timestamp asc',
             (price,)
         ).fetchall()
 
@@ -111,7 +102,7 @@ def limit_order(c: sqlite3.Cursor, *, participant_id: str, price: int, amount: i
             break
         elif remaining < -counter_amount:
             # Appetite fulfilled, but this order too big
-            c.execute('update exchange set amount=? where timestamp=?', (-counter_amount - remaining, ts))
+            c.execute('update exchange set amount=? where logical_timestamp=?', (-counter_amount - remaining, ts))
             fulfilled.append(timestamp)
             break
         else:
@@ -119,10 +110,10 @@ def limit_order(c: sqlite3.Cursor, *, participant_id: str, price: int, amount: i
     else:
         # We fell off the end there: this means our order did not get completely fulfilled
         if time_in_force == 'GTC':
-            c.execute('update exchange set amount=? where timestamp=?', (remaining, timestamp))
+            c.execute('update exchange set amount=? where logical_timestamp=?', (remaining, timestamp))
         else:
             fulfilled.append(timestamp)
-    c.executemany('delete from exchange where timestamp=?', [(ts,) for ts in fulfilled])
+    c.executemany('delete from exchange where logical_timestamp=?', [(ts,) for ts in fulfilled])
 
     # Update account balances
     c.executemany('update accounts set balance=balance+? where participant_id=?',
@@ -137,8 +128,8 @@ def test_no_counterparty(orderbook):
         {'participant_id': 1, 'price': 31, 'amount': 5},
     ]
     c = orderbook.cursor()
-    orders[0]['timestamp'] = limit_order(c, **orders[0])
-    orders[1]['timestamp'] = limit_order(c, **orders[1])
+    orders[0]['logical_timestamp'] = limit_order(c, **orders[0])
+    orders[1]['logical_timestamp'] = limit_order(c, **orders[1])
     result, _ = read(c)
     assert result == OrderFree([orders[0], orders[1]])
 
@@ -153,11 +144,11 @@ def test_buy_order(orderbook):
     c = orderbook.cursor()
     insert_accounts(orderbook, accounts)
 
-    orders[0]['timestamp'] = limit_order(c, **orders[0])
+    orders[0]['logical_timestamp'] = limit_order(c, **orders[0])
     book_, accounts_ = read(c)
     assert book_ == [orders[0]] and accounts == OrderFree(accounts_)
 
-    orders[1]['timestamp'] = limit_order(c, **orders[1])
+    orders[1]['logical_timestamp'] = limit_order(c, **orders[1])
     book_, accounts_ = read(c)
     assert (book_ == []) and (
             accounts_ == OrderFree([{'participant_id': 0, 'balance': 255}, {'participant_id': 1, 'balance': -55}]))
@@ -175,11 +166,11 @@ def test_sell_order(orderbook):
     c = orderbook.cursor()
     insert_accounts(orderbook, accounts)
 
-    orders[0]['timestamp'] = limit_order(c, **orders[0])
+    orders[0]['logical_timestamp'] = limit_order(c, **orders[0])
     book_, accounts_ = read(c)
     assert book_ == [orders[0]] and accounts == OrderFree(accounts_)
 
-    orders[1]['timestamp'] = limit_order(c, **orders[1])
+    orders[1]['logical_timestamp'] = limit_order(c, **orders[1])
     book_, accounts_ = read(c)
     assert (book_ == []) and (
             accounts_ == OrderFree([{'participant_id': 0, 'balance': -55}, {'participant_id': 1, 'balance': 255}]))
@@ -197,8 +188,8 @@ def test_ioc_order(orderbook):
     c = orderbook.cursor()
     insert_accounts(c, accounts)
 
-    orders[0]['timestamp'] = limit_order(c, **orders[0])
-    orders[1]['timestamp'] = limit_order(c, **orders[1])
+    orders[0]['logical_timestamp'] = limit_order(c, **orders[0])
+    orders[1]['logical_timestamp'] = limit_order(c, **orders[1])
     book_, accounts_ = read(c)
     assert (book_ == []) \
            and accounts_ == OrderFree([{'participant_id': 0, 'balance': 255}, {'participant_id': 1, 'balance': -55}])
@@ -217,9 +208,9 @@ def test_price_priority(orderbook):
     c = orderbook.cursor()
     insert_accounts(c, accounts)
 
-    orders[0]['timestamp'] = limit_order(c, **orders[0])
-    orders[1]['timestamp'] = limit_order(c, **orders[1])
-    orders[2]['timestamp'] = limit_order(c, **orders[2])
+    orders[0]['logical_timestamp'] = limit_order(c, **orders[0])
+    orders[1]['logical_timestamp'] = limit_order(c, **orders[1])
+    orders[2]['logical_timestamp'] = limit_order(c, **orders[2])
 
     book_, accounts_ = read(c)
     assert (book_ == [orders[0]]) \
@@ -241,9 +232,9 @@ def test_time_priority(orderbook):
     c = orderbook.cursor()
     insert_accounts(c, accounts)
 
-    orders[0]['timestamp'] = limit_order(c, **orders[0])
-    orders[1]['timestamp'] = limit_order(c, **orders[1])
-    orders[2]['timestamp'] = limit_order(c, **orders[2])
+    orders[0]['logical_timestamp'] = limit_order(c, **orders[0])
+    orders[1]['logical_timestamp'] = limit_order(c, **orders[1])
+    orders[2]['logical_timestamp'] = limit_order(c, **orders[2])
 
     book_, accounts_ = read(c)
     assert (book_ == [orders[1]]) \

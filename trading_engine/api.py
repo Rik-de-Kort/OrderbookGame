@@ -14,8 +14,11 @@ from typing import Literal
 EPOCH = datetime.now()
 load_dotenv()
 
+N_REQUESTS = 5
+N_SECONDS = 1
 
-def rate_limit(request: Request, c=Depends(db_cursor), n_requests=5, n_seconds=1):
+
+def rate_limit(request: Request, c=Depends(db_cursor)):
     """Use ratelimit table to limit number of requests to n_requests per n_seconds."""
     request_timestamp = (datetime.now() - EPOCH).total_seconds()
     request_ip = request.client.host
@@ -23,9 +26,9 @@ def rate_limit(request: Request, c=Depends(db_cursor), n_requests=5, n_seconds=1
     requests_in_last_second = query(
         c,
         'select count(rowid) from ratelimit where ip=? and relative_timestamp >= ?',
-        (request_ip, request_timestamp - n_seconds)
+        (request_ip, request_timestamp - N_SECONDS)
     )[0]['count(rowid)']
-    if requests_in_last_second >= n_requests:
+    if requests_in_last_second >= N_REQUESTS:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail='Exceeded 5 requests per second, try again later.'
@@ -45,17 +48,16 @@ def home():
 
 @app.get('/orderbook')
 def orderbook(c=Depends(db_cursor)):
-    orderbook = query(c, 'select * from exchange')
+    book = query(c, 'select * from exchange')
     return {'data': {
-        'buy': [r for r in orderbook if r['price'] >= 0],
-        'sell': [r for r in orderbook if r['price'] < 0],
+        'buy': [r for r in book if r['amount'] >= 0],
+        'sell': [r for r in book if r['amount'] < 0],
     }}
 
 
 @app.get('/balance')
 def balance(c=Depends(db_cursor), user=Depends(get_user_for_token)):
-    balance = query(c, 'select balance from accounts natural join auth where auth.name=?', (user.name,))
-    return balance[0]
+    return query(c, 'select balance from accounts natural join auth where auth.name=?', (user.name,))[0]
 
 
 @app.get('/orders/active')

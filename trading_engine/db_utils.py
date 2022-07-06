@@ -37,7 +37,8 @@ def create_mock_db(location: Path | str) -> sqlite3.Connection:
 def create_db(location):
     if location != ':memory:':
         location = Path(location) if isinstance(location, str) else location
-        if location.exists(): location.unlink()
+        if location.exists():
+            location.unlink()
     conn = connect_to_db(location)
     # Terminology:
     # - A logical timestamp is an integer which can be used to order events
@@ -88,9 +89,9 @@ def connect_to_db(location: Optional[Path] = None) -> sqlite3.Connection:
 
 
 def db_cursor() -> sqlite3.Cursor:
-    """db_connection for use with FastAPI. Otherwise we're allowing callers to connect to arbitrary databases."""
+    """db_connection for use with FastAPI. Otherwise, we're allowing callers to connect to arbitrary databases."""
+    conn = connect_to_db(None)
     try:
-        conn = connect_to_db(None)
         yield conn.cursor()
     finally:
         conn.close()
@@ -110,6 +111,6 @@ if __name__ == '__main__':
     from dotenv import load_dotenv
 
     load_dotenv()
-    conn = create_mock_db(Path(os.environ['DB_LOCATION']))
-    conn.commit()
-    conn.close()
+    mock_conn = create_mock_db(Path(os.environ['DB_LOCATION']))
+    mock_conn.commit()
+    mock_conn.close()

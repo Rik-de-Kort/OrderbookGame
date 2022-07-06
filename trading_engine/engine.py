@@ -62,7 +62,7 @@ def read(book: sqlite3.Cursor) -> tuple[list[dict], list[dict]]:
 def limit_order(c: sqlite3.Cursor, *, participant_id: str, price: int, amount: int, time_in_force='GTC') -> int:
     assert time_in_force in ('GTC', 'IOC')
     # print('limit order', participant_id, price, amount, time_in_force)
-    # Insert transaction into order book so it gets a timestamp
+    # Insert transaction into order book, so it gets a timestamp
     timestamp = insert_order(c, participant_id=participant_id, price=price, amount=amount)
 
     # Fetch matching transactions from the order c

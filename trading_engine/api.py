@@ -91,6 +91,7 @@ def cancel(logical_timestamp: int, c=Depends(db_cursor), user=Depends(get_user_f
     ).fetchall()
     if not cancelled:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, f'User {user} does not own order {logical_timestamp}')
+    c.connection.commit()
     return f'Cancelled order {logical_timestamp}.'
 
 

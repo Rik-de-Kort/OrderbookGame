@@ -2,14 +2,14 @@ import json
 import os
 from pathlib import Path
 import sqlite3
-from typing import Optional, Any
+from typing import Optional, Any, Union
 
 sqlite3.register_converter('boolean', lambda v: bool(int(v)))
 sqlite3.register_adapter(bool, int)
 sqlite3.register_converter('json', json.loads)
 
 
-def create_mock_db(location: Path | str) -> sqlite3.Connection:
+def create_mock_db(location: Union[Path,str]) -> sqlite3.Connection:
     conn = create_db(location)
     accounts = [
         {
@@ -105,7 +105,7 @@ def db_cursor() -> sqlite3.Cursor:
         conn.close()
 
 
-def query(c: sqlite3.Connection | sqlite3.Cursor, sql: str, data: tuple = None) -> list[dict[str, Any]]:
+def query(c: Union[sqlite3.Connection, sqlite3.Cursor], sql: str, data: tuple = None) -> list[dict[str, Any]]:
     if data is None:
         result = c.execute(sql).fetchall()
     else:

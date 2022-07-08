@@ -8,13 +8,15 @@ Todo list:
 - [x] Keep an event log of what happened at the exchange
 - [x] Create a trades endpoint to view past trades
 - [x] Set up rate limiting for the backend
-- [ ] Integration tests for the backend
-- [ ] Deploy somewhere
+- [x] Deploy somewhere
+- [ ] Write a fuzz tester for the backend
+- [ ] Performance measuring
 
 Backlog:
-- [ ] Create a front end 
-- [ ] Write a fuzz tester for the backend
-- [ ] Add news feed
 - [ ] Add dividend payouts so price means something
+- [ ] Add news feed
+- [ ] Add bots
+- [ ] Create a front end 
+- [ ] Hide secrets in key vault or something
 - [ ] Support for multiple instruments
 - [ ] Support for multiple exchanges

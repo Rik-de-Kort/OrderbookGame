@@ -60,6 +60,22 @@ def trades(c=Depends(db_cursor)):
     return query(c, 'select * from log where event ->> \'type\' = \'trade\'')
 
 
+@app.get('/earnings')
+def list_earnings(c=Depends(db_cursor)):
+    return query(c, 'select * from earnings order by timestamp desc')
+
+
+@app.post('/earnings')
+def post_earnings(amount: int, c=Depends(db_cursor), user=Depends(get_user_for_token)):
+    if user.participant_id != 0:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail='Only the boss can post earnings!'
+        )
+    c.execute('insert into earnings (amount, timestamp) values (?, ?)', (amount, datetime.now()))
+    c.connection.commit()
+
+
 @app.get('/balance')
 def balance(c=Depends(db_cursor), user=Depends(get_user_for_token)):
     return query(c, 'select balance from accounts natural join auth where auth.name=?', (user.name,))[0]

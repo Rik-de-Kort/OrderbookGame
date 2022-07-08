@@ -1,6 +1,7 @@
 import json
 import os
 from pathlib import Path
+from datetime import datetime
 import sqlite3
 from typing import Optional, Any, Union
 
@@ -32,6 +33,9 @@ def create_mock_db(location: Union[Path,str]) -> sqlite3.Connection:
     conn.executemany(
         'insert into accounts(participant_id, balance) values (:participant_id, :balance)', accounts
     )
+    conn.execute(
+        'insert into earnings(amount, timestamp) values (?, ?)', (10000, datetime.now())
+    )
     conn.commit()
     return conn
 
@@ -46,6 +50,8 @@ def create_db(location):
     # - A logical timestamp is an integer which can be used to order events
     # - A relative timestamp is a real that indicates a certain offset from some epoch
     # - A (normal) timestamp is a specific point in time, local to the server
+
+    # Trading tables
     conn.execute(
         'create table exchange ('
         '   participant_id integer,'
@@ -55,17 +61,25 @@ def create_db(location):
         ')'
     )
     conn.execute(
-        'create table log ('
-        '  event json,'
-        '  timestamp text'
-        ')'
-    )
-    conn.execute(
         'create table accounts ('
         '  participant_id integer primary key,'
         '  balance integer default 0 not null'
         ')'
     )
+    conn.execute(
+        'create table log ('
+        '  event json,'
+        '  timestamp text'
+        ')'
+    )
+    # Earnings table
+    conn.execute(
+        'create table earnings ('
+        '  amount integer,'
+        '  timestamp text'
+        ')'
+    )
+    # Auxiliary tables
     conn.execute(
         'create table auth ('
         '  participant_id integer primary key,'

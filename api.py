@@ -129,7 +129,7 @@ def cancel_all(c=Depends(db_cursor), user=Depends(get_user_for_token)):
     return f'Cancelled {len(cancelled)} orders: {cancelled}.'
 
 
-@app.post('/signup')
+@app.post('/signup', status_code=201)
 def sign_up(user: User = Depends(create_user)):
     return user
 

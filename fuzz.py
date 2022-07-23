@@ -1,11 +1,12 @@
 from functools import wraps
 import os
+from random import choice, randrange
+from time import time
 import tempfile
 from typing import Callable
 
 from fastapi.testclient import TestClient
 from hypothesis import strategies as st, given, settings
-import pytest
 
 import api as api
 from db_utils import create_db
@@ -78,12 +79,30 @@ def logged_in_users():
     return users
 
 
+
 @with_temp_db
 def test_fuzz():
     users = logged_in_users()
-    # Todo: start writing home-grown fuzz test.
-    # Todo: participant id not provided??
-    params = {"p": 10, "q": 10, "d": "buy", "tif": "GTC"}
-    user = users[0]
-    response = client.post('/submit', params=params, headers={'Authorization': f'Bearer {user["token"]}'})
-    assert response.status_code == 201
+    # Participant id is taken care of via token due to auth
+    routes = [
+        (client.get, '/', lambda: {}),
+        (client.get, '/orderbook', lambda: {}),
+        (client.get, '/trades', lambda: {}),
+        (client.get, '/earnings', lambda: {}),
+        (client.get, '/balance', lambda: {}),
+        (client.get, '/orders/active', lambda: {}),
+        (client.post, '/submit', lambda: {'json': {
+            'p': randrange(0, 100), 'q': randrange(0, 100), 'd': choice(['buy', 'sell']), 'tif': choice(['GTC', 'IOC'])
+        }}),
+        (client.post, '/cancel', lambda: {'params': {'logical_timestamp': randrange(0, 100)}}),
+        (client.post, '/cancel/all', lambda: {}),
+        (client.get, '/me', lambda: {}),
+    ]
+    start_time = time()
+    while time() - start_time < 10:
+        user = choice(users)
+        method, url, make_payload = choice(routes)
+        payload = make_payload()
+        print(user['name'], url)
+        response = method(url, headers={'Authorization': f'Bearer {user["token"]}'}, **payload)
+        print(response.status_code, response.json())

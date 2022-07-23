@@ -82,13 +82,14 @@ def create_user(name: str, password: SecretStr, c=Depends(db_cursor)) -> User:
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f'This user already exists!'
         )
-    participant_id_wrapped = query(
+    participant = query(
         c,
         'insert into auth(name, hashed_password) values (?, ?) returning participant_id, name',
         (name, hash_password(password.get_secret_value()))
-    )
+    )[0]
+    c.execute('insert into accounts(participant_id, balance) values (?, 100)', (participant['participant_id'],))
     c.connection.commit()
-    return User(**participant_id_wrapped[0])
+    return User(**participant)
 
 
 def create_token(data: dict, expires: Optional[timedelta] = None) -> str:

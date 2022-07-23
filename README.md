@@ -9,11 +9,12 @@ Todo list:
 - [x] Create a trades endpoint to view past trades
 - [x] Set up rate limiting for the backend
 - [x] Deploy somewhere
-- [ ] Write a fuzz tester for the backend
+- [x] Write a fuzz tester for the backend
 - [ ] Performance measuring
 
 Backlog:
 - [ ] Add dividend payouts so price means something
+- [ ] Deploy earnings poster somewhere
 - [ ] Add news feed
 - [ ] Add bots
 - [ ] Create a front end 

@@ -10,7 +10,7 @@ Todo list:
 - [x] Set up rate limiting for the backend
 - [x] Deploy somewhere
 - [x] Write a fuzz tester for the backend
-- [ ] Add dividend payouts so price means something
+- [x] Add dividend payouts so price means something
 - [ ] Fix up number of stocks: orchestrator should start with all stocks in circulation!
 - [ ] Write and deploy game orchestrator (separately!)
 - [ ] Create a front end 

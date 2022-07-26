@@ -103,3 +103,12 @@ def create_authenticated_token(c=Depends(db_cursor), form_data: OAuth2PasswordRe
     user = authenticate_user(c, form_data.username, form_data.password)
     token = create_token({'sub': user.name})
     return {'access_token': token, 'token_type': 'bearer'}
+
+
+def admin(user=Depends(get_user_for_token)):
+    if user.participant_id != 0:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail='Only the boss can post earnings!'
+        )
+    return True

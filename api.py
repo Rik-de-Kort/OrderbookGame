@@ -2,7 +2,7 @@ from dotenv import load_dotenv
 from pydantic import BaseModel, Field
 from fastapi import FastAPI, Depends, status, Request
 
-from auth import User, get_user_for_token, HTTPException
+from auth import User, get_user_for_token, HTTPException, admin
 from auth import create_authenticated_token, create_user
 from db_utils import db_cursor, query
 from engine import limit_order
@@ -66,13 +66,16 @@ def list_earnings(c=Depends(db_cursor)):
 
 
 @app.post('/earnings')
-def post_earnings(amount: int, c=Depends(db_cursor), user=Depends(get_user_for_token)):
-    if user.participant_id != 0:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail='Only the boss can post earnings!'
-        )
+def post_earnings(amount: int, c=Depends(db_cursor), is_admin=Depends(admin)):
     c.execute('insert into earnings (amount, timestamp) values (?, ?)', (amount, datetime.now()))
+    c.connection.commit()
+
+
+@app.post('/dividends')
+def pay_dividends(dividend_per_share: int, c=Depends(db_cursor), is_admin=Depends(admin)):
+    all_accounts = query(c, 'select participant_id, stock from accounts')
+    c.executemany('update accounts set balance = balance + ? where participant_id=?',
+                  [(r['stock'] * dividend_per_share, r['participant_id']) for r in all_accounts])
     c.connection.commit()
 
 

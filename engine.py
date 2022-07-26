@@ -13,6 +13,7 @@ def insert_order(book: sqlite3.Cursor, participant_id: str, price: int, amount: 
 
 def limit_order(c: sqlite3.Cursor, *, participant_id: str, price: int, amount: int, time_in_force='GTC') -> int:
     assert time_in_force in ('GTC', 'IOC')
+    assert price > 0
     # print('limit order', participant_id, price, amount, time_in_force)
     # Insert transaction into order book, so it gets a timestamp
     timestamp = insert_order(c, participant_id=participant_id, price=price, amount=amount)
@@ -33,7 +34,8 @@ def limit_order(c: sqlite3.Cursor, *, participant_id: str, price: int, amount: i
 
     # Fulfill transactions in turn
     remaining = amount
-    delta = defaultdict(lambda: 0)
+    delta_balance = defaultdict(lambda: 0)
+    delta_stock = defaultdict(lambda: 0)
     log = []
     fulfilled = []
     for idx, ts, counter_amount, price in matching:
@@ -41,15 +43,19 @@ def limit_order(c: sqlite3.Cursor, *, participant_id: str, price: int, amount: i
             # "Eat" this order, still some appetite left
             remaining += counter_amount
 
-            delta[idx] -= counter_amount * price
-            delta[participant_id] += counter_amount * price
+            delta_stock[idx] += counter_amount
+            delta_balance[idx] -= counter_amount * price
+            delta_stock[participant_id] -= counter_amount
+            delta_balance[participant_id] += counter_amount * price
 
             fulfilled.append(ts)
             log.append((idx, counter_amount, price))
         elif remaining == -counter_amount:
             # "Eat" this order, appetite fulfilled
-            delta[idx] -= counter_amount * price
-            delta[participant_id] += counter_amount * price
+            delta_stock[idx] += counter_amount
+            delta_balance[idx] -= counter_amount * price
+            delta_stock[participant_id] -= counter_amount
+            delta_balance[participant_id] += counter_amount * price
 
             fulfilled.append(ts)
             fulfilled.append(timestamp)
@@ -57,7 +63,13 @@ def limit_order(c: sqlite3.Cursor, *, participant_id: str, price: int, amount: i
             break
         elif remaining < -counter_amount:
             # Appetite fulfilled, but this order too big
-            c.execute('update exchange set amount=? where logical_timestamp=?', (-counter_amount - remaining, ts))
+            c.execute('update exchange set amount=? where logical_timestamp=?', (counter_amount + remaining, ts))
+
+            delta_stock[idx] -= remaining
+            delta_balance[idx] += remaining * price
+            delta_stock[participant_id] += remaining
+            delta_balance[participant_id] -= remaining * price
+
             fulfilled.append(timestamp)
             log.append((idx, counter_amount, price))
             break
@@ -71,9 +83,11 @@ def limit_order(c: sqlite3.Cursor, *, participant_id: str, price: int, amount: i
             fulfilled.append(timestamp)
     c.executemany('delete from exchange where logical_timestamp=?', [(ts,) for ts in fulfilled])
 
-    # Update account balances
+    # Update account balances  # Todo: unify this using pairs?
     c.executemany('update accounts set balance=balance+? where participant_id=?',
-                  [(d, idx) for idx, d in delta.items()])
+                  [(d, idx) for idx, d in delta_balance.items()])
+    c.executemany('update accounts set stock=stock+? where participant_id=?',
+                  [(d, idx) for idx, d in delta_stock.items()])
     c.connection.commit()
 
     log = [
@@ -91,5 +105,3 @@ def limit_order(c: sqlite3.Cursor, *, participant_id: str, price: int, amount: i
     c.connection.commit()
 
     return timestamp
-
-

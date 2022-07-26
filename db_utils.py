@@ -17,13 +17,15 @@ def create_mock_db(location: Union[Path,str]) -> sqlite3.Connection:
             'participant_id': 0,
             'name': 'rik',
             'hashed_password': '$2b$12$IPLrdHW7c.Z9i9qzBfzKMud8W9vuRotGEqqs690IPukZkNhPD9YOi',  # foo123
-            'balance': 100
+            'balance': 100,
+            'stock': 10,
         },
         {
             'participant_id': 1,
             'name': 'ada',
             'hashed_password': '$2b$12$Nq6wV4XoWJRCUc8efmf0IOzYkFR0Rh.D0y8rKd0e7wV9MW2OQrqaC',  # bar123
             'balance': 100,
+            'stock': 10,
         }
     ]
     conn.executemany(
@@ -31,7 +33,7 @@ def create_mock_db(location: Union[Path,str]) -> sqlite3.Connection:
         accounts
     )
     conn.executemany(
-        'insert into accounts(participant_id, balance) values (:participant_id, :balance)', accounts
+        'insert into accounts(participant_id, balance, stock) values (:participant_id, :balance, :stock)', accounts
     )
     conn.execute(
         'insert into earnings(amount, timestamp) values (?, ?)', (10000, datetime.now())
@@ -63,7 +65,8 @@ def create_db(location):
     conn.execute(
         'create table accounts ('
         '  participant_id integer primary key,'
-        '  balance integer default 0 not null'
+        '  balance integer default 0 not null,'
+        '  stock integer default 0 not null'
         ')'
     )
     conn.execute(

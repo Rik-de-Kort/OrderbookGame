@@ -10,14 +10,14 @@ Todo list:
 - [x] Set up rate limiting for the backend
 - [x] Deploy somewhere
 - [x] Write a fuzz tester for the backend
-- [ ] Performance measuring
+- [ ] Add dividend payouts so price means something
+- [ ] Write and deploy game orchestrator (separately!)
+- [ ] Create a front end 
 
 Backlog:
-- [ ] Add dividend payouts so price means something
-- [ ] Deploy earnings poster somewhere
+- [ ] Performance measuring
 - [ ] Add news feed
 - [ ] Add bots
-- [ ] Create a front end 
 - [ ] Hide secrets in key vault or something
 - [ ] Support for multiple instruments
 - [ ] Support for multiple exchanges

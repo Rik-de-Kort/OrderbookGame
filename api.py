@@ -71,6 +71,22 @@ def post_earnings(amount: int, c=Depends(db_cursor), is_admin=Depends(admin)):
     c.connection.commit()
 
 
+@app.post('/send_cash')
+def send_cash(user_name: str, amount: int, c=Depends(db_cursor), is_admin=Depends(admin)):
+    c.execute(
+        'update accounts set balance = balance + ?'
+        'where participant_id=(select participant_id from users where name=?)',
+        (amount, user_name)
+    )
+    c.connection.commit()
+
+
+@app.post('/stock_sale')
+def stock_sale(amount: int, price: int, c=Depends(db_cursor), is_admin=Depends(admin)):
+    limit_order(c, participant_id='0', price=price, amount=-amount, time_in_force='GTC')
+    c.connection.commit()
+
+
 @app.post('/dividends')
 def pay_dividends(dividend_per_share: int, c=Depends(db_cursor), is_admin=Depends(admin)):
     all_accounts = query(c, 'select participant_id, stock from accounts')

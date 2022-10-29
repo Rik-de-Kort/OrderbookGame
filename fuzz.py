@@ -97,6 +97,9 @@ def test_fuzz():
         (client.post, '/cancel', lambda: {'params': {'logical_timestamp': randrange(0, 100)}}),
         (client.post, '/cancel/all', lambda: {}),
         (client.get, '/me', lambda: {}),
+        (client.post, '/earnings', lambda: {'params': {'amount': randrange(-10000, 10000)}}),
+        (client.post, '/stock_sale', lambda: {'params': {'amount': randrange(0, 1000), 'price': randrange(10, 100)}}),
+        (client.post, '/send_cash', lambda: {'params': {'user_name': choice(users)['name']}})
     ]
     start_time = time()
     while time() - start_time < 10:

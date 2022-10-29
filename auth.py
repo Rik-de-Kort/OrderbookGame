@@ -109,6 +109,6 @@ def admin(user=Depends(get_user_for_token)):
     if user.participant_id != 0:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail='Only the boss can post earnings!'
+            detail='Only the boss can do that!'
         )
     return True

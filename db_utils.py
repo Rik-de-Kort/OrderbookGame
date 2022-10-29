@@ -44,9 +44,8 @@ def create_mock_db(location: Union[Path,str]) -> sqlite3.Connection:
 
 def create_db(location):
     if location != ':memory:':
-        location = Path(location) if isinstance(location, str) else location
-        if location.exists():
-            location.unlink()
+        location = Path(location)
+        location.unlink(missing_ok=True)
     conn = connect_to_db(location)
     # Terminology:
     # - A logical timestamp is an integer which can be used to order events

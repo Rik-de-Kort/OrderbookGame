@@ -15,6 +15,11 @@ def limit_order(c: sqlite3.Cursor, *, participant_id: str, price: int, amount: i
     assert time_in_force in ('GTC', 'IOC')
     assert price > 0
     # print('limit order', participant_id, price, amount, time_in_force)
+
+    # Check if allowed: no short restriction is active
+    stock_in_account, *_ = c.execute('select stock from accounts where participant_id=?', (participant_id,)).fetchone()
+    if stock_in_account + amount < 0: raise Exception('Shorting is not allowed.')
+
     # Insert transaction into order book, so it gets a timestamp
     timestamp = insert_order(c, participant_id=participant_id, price=price, amount=amount)
 

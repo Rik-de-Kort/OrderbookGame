@@ -98,14 +98,17 @@ class Order(BaseModel):
 
 @app.post('/submit')
 def submit(order: Order, c=Depends(db_cursor), user=Depends(get_user_for_token)):
-    timestamp = limit_order(
-        c,
-        participant_id=user.participant_id,
-        price=order.p,
-        amount=(order.q if order.d == 'buy' else -order.q),
-        time_in_force=order.tif
-    )
-    return timestamp
+    try:
+        timestamp = limit_order(
+            c,
+            participant_id=user.participant_id,
+            price=order.p,
+            amount=(order.q if order.d == 'buy' else -order.q),
+            time_in_force=order.tif
+        )
+        return timestamp
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @app.post('/cancel')
